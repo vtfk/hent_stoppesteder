@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/Hent Stoppesteder" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>

@@ -1,1 +1,16 @@
 Henter stoppesteder for buss i Vestfold og Telemark og skriver disse til QIGS. Hvordan ta i bruk Last ned som zip og importer i QIGS.
+
+Hvordan ta i bruk pluginen til QGIS
+
+1.Last ned versjon 3.16 av QGIS (andre versjoner kan fungere det også, men er ikke testet) 
+
+2.Last ned koden som zip fil. Dette gjør du ved å trykke på «CODE»
+	a.Dowload ZIP
+
+3.Åpne QGIS og åpne «Programtillegg» menyen
+	a.Trykk på håndtering og installering av programtillegg.
+	b.Deretter bruker du navigeringen på venstre side i vinduet som åpnet til å finne vinduet for installering fra ZIP
+	c.Naviger frem til ZIP filen du lastet ned i steg 2a
+	i.Trykk «Installer programtillegg
+
+4.Pluginen vil nå ligge under «Programtillegg» menyen og som et icon på toolbaren.  

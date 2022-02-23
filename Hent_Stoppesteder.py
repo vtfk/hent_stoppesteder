@@ -24,7 +24,7 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-from qgis.core import QgsVectorLayer, QgsProject
+from qgis.core import QgsVectorLayer, QgsProject, QgsMessageLog, QgsRasterLayer, QgsLayerDefinition
 # Initialize Qt resources from file resources.py
 from .resources import *
 # Import the code for the dialog
@@ -197,6 +197,17 @@ class loadStopPlacesBuss:
         request_telemark = requests.get(url_telemark, allow_redirects=True)
         request_vestfold = requests.get(url_vestfold, allow_redirects=True)
 
+        """Check if the request is ok"""
+        if request_telemark.ok:
+            return request_telemark
+        else:
+            return QgsMessageLog.logMessage('Feilet ved henting av stoppestedene i Telemark')
+
+        if request_vestfold.ok:
+            return request_vestfold
+        else:
+            return QgsMessageLog.logMessage('Feilet ved henting av stoppestedene i Vestfold')
+
         telemark_data_zip = zipfile.ZipFile(io.BytesIO(request_telemark.content))
         telemark_data_zip_namelist = telemark_data_zip.namelist()
         vestfold_data_zip = zipfile.ZipFile(io.BytesIO(request_vestfold.content))
@@ -218,7 +229,7 @@ class loadStopPlacesBuss:
                     vestfold_data_zip.extract('stops.txt', './filer/vestfold')
                 else:
                     pass
-            print("Sletter gamle filer og laster ned nye")
+            QgsMessageLog.logMessage("Sletter gamle filer og laster ned nye")
         else:
             for name in telemark_data_zip_namelist:
                 if name == 'stops.txt':
@@ -231,7 +242,7 @@ class loadStopPlacesBuss:
                     vestfold_data_zip.extract('stops.txt', './filer/vestfold')
                 else:
                     pass
-            print("Det finnes ingen filer, laster ned filene")
+            QgsMessageLog.logMessage("Det finnes ingen filer, laster ned filene")
 
     def combine_files(self):
         with open('./filer/telemark/stops.txt', 'r') as ftlm:
@@ -268,16 +279,24 @@ class loadStopPlacesBuss:
             'NSR:StopPlace:')]  # 'NSR:StopPlace:' er et felles punkt der det finnest 2 eller flere stoppesteder.
         stopPlace_removed.to_csv(file, encoding='utf-8', index=False)
 
+    def load_osm(self):
+        url_params = 'type=xyz&url=https://tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0'
+        osm_layer = QgsRasterLayer(url_params, 'OpenStreetMap', 'wms')
+
+        if osm_layer.isValid():
+            QgsProject.instance().addMapLayer(osm_layer)
+        else:
+            QgsMessageLog.logMessage('The layer is not valid')
+
     def load_csv_to_qgis(self):
         file_to_qgis = "file:///{}{}{}?delimiter={}&xField={}&yField={}".\
             format(os.getcwd(), "/", file, ",", "stop_lon", "stop_lat")
         layer_stoppesteder = QgsVectorLayer(file_to_qgis, "vtfk-stoppesteder", "delimitedtext")
         if not layer_stoppesteder.isValid():
-            print("Laget er ikke gyldig.")
+            QgsMessageLog.logMessage("Laget er ikke gyldig.")
         else:
             QgsProject.instance().addMapLayer(layer_stoppesteder)
-            print("Laget er lastet inn. Husk å legge til OpenStreetMap.")
-        #TODO Automatisk legge til OpenStreetMap?
+            QgsMessageLog.logMessage("Laget er lastet inn. Husk å legge til OpenStreetMap.")
 
     def run(self):
         """Run method that performs all the real work"""
@@ -298,4 +317,7 @@ class loadStopPlacesBuss:
             self.combine_files()
             self.remove_vehicle_type()
             self.remove_stopPlace()
+            #self.load_osm()
             self.load_csv_to_qgis()
+
+

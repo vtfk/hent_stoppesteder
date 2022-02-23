@@ -273,10 +273,10 @@ class loadStopPlacesBuss:
             format(os.getcwd(), "/", file, ",", "stop_lon", "stop_lat")
         layer_stoppesteder = QgsVectorLayer(file_to_qgis, "vtfk-stoppesteder", "delimitedtext")
         if not layer_stoppesteder.isValid():
-            print("Laget er ikke gyldig, ring en venn.")
+            print("Laget er ikke gyldig.")
         else:
             QgsProject.instance().addMapLayer(layer_stoppesteder)
-            print("Laget er lastet inn. Husk å legge til OpenStreetMap for en bedre opplevelse.")
+            print("Laget er lastet inn. Husk å legge til OpenStreetMap.")
         #TODO Automatisk legge til OpenStreetMap?
 
     def run(self):

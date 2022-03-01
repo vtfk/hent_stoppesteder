@@ -46,6 +46,7 @@ file = ('results_stops_vtfk.csv')
 file_t = ('results_stops_telemark.csv')
 file_v = ('results_stops_vestfold.csv')
 write_to_file = ''
+
 class loadStopPlacesBuss:
     """QGIS Plugin Implementation."""
 
@@ -200,7 +201,7 @@ class loadStopPlacesBuss:
         url_telemark = 'https://storage.googleapis.com/marduk-production/outbound/gtfs/rb_tel-aggregated-gtfs.zip'
         request_telemark = requests.get(url_telemark, allow_redirects=True)
 
-        """Check if the request is ok"""
+        # Check if the request is ok
         if request_telemark.ok:
             return request_telemark
         else:
@@ -212,7 +213,7 @@ class loadStopPlacesBuss:
         url_vestfold = 'https://storage.googleapis.com/marduk-production/outbound/gtfs/rb_vkt-aggregated-gtfs.zip'
         request_vestfold = requests.get(url_vestfold, allow_redirects=True)
 
-        """Check if the request is ok"""
+        # Check if the request is ok
         if request_vestfold.ok:
             return request_vestfold
         else:
@@ -375,6 +376,7 @@ class loadStopPlacesBuss:
 
         # Check if the layer is valid
         if not layer_stoppesteder.isValid():
+
             QgsMessageLog.logMessage("Laget er ikke gyldig.")
         else:
             # Add the layer to qgis and hide it.
@@ -446,7 +448,7 @@ class loadStopPlacesBuss:
             self.dlg.label_valg.setText('Vestfold')
         else:
             self.dlg.label_valg.setText('')
-
+            
     def run(self):
         """Run method that performs all the real work"""
 

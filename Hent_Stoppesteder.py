@@ -21,14 +21,19 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
-from qgis.PyQt.QtGui import QIcon
+from os import path
+
+from qgis.core import *
+from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, QTimer
+from qgis.PyQt.QtGui import *
+from qgis.utils import iface
 from qgis.PyQt.QtWidgets import QAction
 from qgis.core import QgsVectorLayer, QgsProject, QgsMessageLog, QgsRasterLayer, QgsLayerDefinition
 # Initialize Qt resources from file resources.py
 from .resources import *
 # Import the code for the dialog
 from .Hent_Stoppesteder_dialog import loadStopPlacesBussDialog
+
 import os.path
 import csv
 import os
@@ -36,13 +41,11 @@ import pandas as pd
 import requests
 import zipfile
 import io
-import time
-from os import path
-
 
 file = ('results_stops_vtfk.csv')
-
-
+file_t = ('results_stops_telemark.csv')
+file_v = ('results_stops_vestfold.csv')
+write_to_file = ''
 class loadStopPlacesBuss:
     """QGIS Plugin Implementation."""
 
@@ -54,6 +57,7 @@ class loadStopPlacesBuss:
             application at run time.
         :type iface: QgsInterface
         """
+        self.dlg = loadStopPlacesBussDialog()
         # Save reference to the QGIS interface
         self.iface = iface
         # initialize plugin directory
@@ -66,6 +70,7 @@ class loadStopPlacesBuss:
             'loadStopPlacesBuss_{}.qm'.format(locale))
 
         if os.path.exists(locale_path):
+
             self.translator = QTranslator()
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
@@ -170,7 +175,6 @@ class loadStopPlacesBuss:
 
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
-
         icon_path = ':/plugins/Hent Stoppesteder/icon.png'
         self.add_action(
             icon_path,
@@ -190,12 +194,11 @@ class loadStopPlacesBuss:
                 action)
             self.iface.removeToolBarIcon(action)
 
+    def get_telemark(self):
+        # Get the stops from Telemark
 
-    def get_files(self):
         url_telemark = 'https://storage.googleapis.com/marduk-production/outbound/gtfs/rb_tel-aggregated-gtfs.zip'
-        url_vestfold = 'https://storage.googleapis.com/marduk-production/outbound/gtfs/rb_vkt-aggregated-gtfs.zip'
         request_telemark = requests.get(url_telemark, allow_redirects=True)
-        request_vestfold = requests.get(url_vestfold, allow_redirects=True)
 
         """Check if the request is ok"""
         if request_telemark.ok:
@@ -203,30 +206,57 @@ class loadStopPlacesBuss:
         else:
             return QgsMessageLog.logMessage('Feilet ved henting av stoppestedene i Telemark')
 
+    def get_vestfold(self):
+        # Get the stops from Vestfold
+
+        url_vestfold = 'https://storage.googleapis.com/marduk-production/outbound/gtfs/rb_vkt-aggregated-gtfs.zip'
+        request_vestfold = requests.get(url_vestfold, allow_redirects=True)
+
+        """Check if the request is ok"""
         if request_vestfold.ok:
             return request_vestfold
         else:
             return QgsMessageLog.logMessage('Feilet ved henting av stoppestedene i Vestfold')
 
-        telemark_data_zip = zipfile.ZipFile(io.BytesIO(request_telemark.content))
-        telemark_data_zip_namelist = telemark_data_zip.namelist()
+    def process_files_vestfold(self):
+        # Process the file from the get_vestfold method.
+
+        request_vestfold = self.get_vestfold()
+
         vestfold_data_zip = zipfile.ZipFile(io.BytesIO(request_vestfold.content))
         vestfold_data_zip_namelist = vestfold_data_zip.namelist()
 
-        file_telemark, file_vestfold = './filer/telemark/stops.txt', './filer/vestfold/stops.txt'
-        if path.isfile(file_telemark) and path.isfile(file_vestfold):
-            os.remove(file_telemark)
+        file_vestfold = './filer/vestfold/stops.txt'
+        if path.isfile(file_vestfold):
             os.remove(file_vestfold)
-
-            for name in telemark_data_zip_namelist:
+            for name in vestfold_data_zip_namelist:
                 if name == 'stops.txt':
-                    telemark_data_zip.extract('stops.txt', './filer/telemark')
+                    vestfold_data_zip.extract('stops.txt', './filer/vestfold')
                 else:
                     pass
+            QgsMessageLog.logMessage("Sletter gamle filer og laster ned nye")
 
             for name in vestfold_data_zip_namelist:
                 if name == 'stops.txt':
                     vestfold_data_zip.extract('stops.txt', './filer/vestfold')
+                else:
+                    pass
+            QgsMessageLog.logMessage("Det finnes ingen filer, laster ned filene")
+
+    def process_files_telemark(self):
+        # Process the file from the get_telemark method.
+
+        request_telemark = self.get_telemark()
+
+        telemark_data_zip = zipfile.ZipFile(io.BytesIO(request_telemark.content))
+        telemark_data_zip_namelist = telemark_data_zip.namelist()
+
+        file_telemark = './filer/telemark/stops.txt'
+        if path.isfile(file_telemark):
+            os.remove(file_telemark)
+            for name in telemark_data_zip_namelist:
+                if name == 'stops.txt':
+                    telemark_data_zip.extract('stops.txt', './filer/telemark')
                 else:
                     pass
             QgsMessageLog.logMessage("Sletter gamle filer og laster ned nye")
@@ -236,67 +266,186 @@ class loadStopPlacesBuss:
                     telemark_data_zip.extract('stops.txt', './filer/telemark')
                 else:
                     pass
-
-            for name in vestfold_data_zip_namelist:
-                if name == 'stops.txt':
-                    vestfold_data_zip.extract('stops.txt', './filer/vestfold')
-                else:
-                    pass
             QgsMessageLog.logMessage("Det finnes ingen filer, laster ned filene")
 
     def combine_files(self):
+        # Combine the files so the user is able to view the two files as one layer in qgis.
+
         with open('./filer/telemark/stops.txt', 'r') as ftlm:
             data_tlm = ftlm.read().splitlines(True)
+            ftlm.close()
         with open('./filer/telemark/stops.txt', 'w') as ftl:
             ftl.writelines(data_tlm[1:])
+            ftl.close()
         with open('./filer/telemark/stops.txt', 'r') as ft:
             data_removed_header = ft.read()
+            ft.close()
         with open('./filer/vestfold/stops.txt', 'r') as fvkt:
             data_vkt = fvkt.read()
+            fvkt.close()
 
         data_vkt += "\n"
         data_vkt += data_removed_header
 
         with open(file, 'w') as fr:
             fr.write(data_vkt)
+            fr.close()
+
+    def file_telemark(self):
+        with open('./filer/telemark/stops.txt', 'r') as ft:
+            data_telemark = ft.read()
+            ft.close()
+
+        # Set the col values for the file.
+        with open(file_t, 'w') as fr:
+            fr.write('stop_id,stop_name,stop_lat,stop_lon,stop_desc,location_type,parent_station,wheelchair_boarding,vehicle_type,platform_code')
+            fr.write(data_telemark)
+            fr.close()
+
+    def file_vestfold(self):
+        with open('./filer/vestfold/stops.txt', 'r') as fvkt:
+            data_vestfold = fvkt.read()
+            fvkt.close()
+            with open(file_v, 'w') as fr:
+                fr.write(data_vestfold)
+                fr.close()
 
     def remove_vehicle_type(self):
+        # Set the correct file and remove unwanted vehicle type.
+        global write_to_file
+        if self.dlg.checkBox_begge.isChecked():
+            write_to_file = file
+        elif self.dlg.checkBox_telemark.isChecked():
+            write_to_file = file_t
+        elif self.dlg.checkBox_vestfold.isChecked():
+            write_to_file = file_v
+
         lines = list()
-        with open(file, 'r') as f:
+        with open(write_to_file, 'r') as f:
             reader = csv.reader(f)
             for row in reader:
                 lines.append(row)
                 for field in row:
                     if field == "1000":  # 1000 = båt
                         lines.remove(row)
-        with open(file, 'w') as wf:
+        with open(write_to_file, 'w') as wf:
             writer = csv.writer(wf)
             writer.writerows(lines)
 
     def remove_stopPlace(self):
-        df = pd.read_csv(file)
+        # Remove unwanted stopplaces from the file.
+        df = pd.read_csv(write_to_file)
         stopPlace_removed = df[~df['stop_id'].astype(str).str.startswith(
             'NSR:StopPlace:')]  # 'NSR:StopPlace:' er et felles punkt der det finnest 2 eller flere stoppesteder.
-        stopPlace_removed.to_csv(file, encoding='utf-8', index=False)
+        stopPlace_removed.to_csv(write_to_file, encoding='utf-8', index=False)
+
 
     def load_osm(self):
-        url_params = 'type=xyz&url=https://tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0'
-        osm_layer = QgsRasterLayer(url_params, 'OpenStreetMap', 'wms')
-
-        if osm_layer.isValid():
-            QgsProject.instance().addMapLayer(osm_layer)
+        #Check if the layer 'OpenStreetMap' exist in the current project. And create it if it dosen't.
+        if len(QgsProject.instance().mapLayersByName('OpenStreetMap')):
+            pass
         else:
-            QgsMessageLog.logMessage('The layer is not valid')
+            url_params = 'type=xyz&url=https://tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0krs=EPSG3857'
+            osm_layer = QgsRasterLayer(url_params, 'OpenStreetMap', 'wms')
+
+            if osm_layer.isValid():
+                QgsProject.instance().addMapLayer(osm_layer)
+            else:
+                QgsMessageLog.logMessage('Laget er ikke gyldig.')
 
     def load_csv_to_qgis(self):
+        # Create a readable file for qgis to load.
+        layer_name = ''
         file_to_qgis = "file:///{}{}{}?delimiter={}&xField={}&yField={}".\
-            format(os.getcwd(), "/", file, ",", "stop_lon", "stop_lat")
-        layer_stoppesteder = QgsVectorLayer(file_to_qgis, "vtfk-stoppesteder", "delimitedtext")
+            format(os.getcwd(), "/", write_to_file, ",", "stop_lon", "stop_lat")
+
+        # Set the name of the layer.
+        if self.dlg.checkBox_begge.isChecked():
+            layer_name = 'Vestfold og Telemark'
+        elif self.dlg.checkBox_telemark.isChecked():
+            layer_name = 'Telemark'
+        elif self.dlg.checkBox_vestfold.isChecked():
+            layer_name = 'Vestfold'
+
+        # Define the layer and set CRS for the layer.
+        layer_stoppesteder = QgsVectorLayer(file_to_qgis, layer_name, "delimitedtext")
+        crs = layer_stoppesteder.crs()
+        crs.createFromId(4326)
+        layer_stoppesteder.setCrs(crs)
+
+        # Check if the layer is valid
         if not layer_stoppesteder.isValid():
             QgsMessageLog.logMessage("Laget er ikke gyldig.")
         else:
-            QgsProject.instance().addMapLayer(layer_stoppesteder)
-            QgsMessageLog.logMessage("Laget er lastet inn. Husk å legge til OpenStreetMap.")
+            # Add the layer to qgis and hide it.
+            QgsProject.instance().addMapLayer(layer_stoppesteder, False)
+            # Load OpenStreetMap
+            self.load_osm()
+            # Insert the map layer as the first layer in the layer group and show it.
+            layer_tree = iface.layerTreeCanvasBridge().rootGroup()
+            layer_tree.insertChildNode(0, QgsLayerTreeLayer(layer_stoppesteder))
+
+            """
+            Check if theres any layers loaded to qgis.
+            If there is a layer present in qgis, emit a signal and run the function. 
+            """
+            if QgsProject.instance().mapLayers():
+                try:
+                    iface.mapCanvas().mapCanvasRefreshed.connect(self.active_layer_changed())
+                except:
+                    pass
+            else:
+                pass
+
+    def active_layer_changed(self):
+        # Set the layer name for the layer to be loaded to qgis.
+        layer_name = ''
+        if self.dlg.checkBox_begge.isChecked():
+            layer_name = 'Vestfold og Telemark'
+        elif self.dlg.checkBox_telemark.isChecked():
+            layer_name = 'Telemark'
+        elif self.dlg.checkBox_vestfold.isChecked():
+            layer_name = 'Vestfold'
+
+        # Set the active layer as the first layer in the layers array in qgis.
+        active_layer = QgsProject.instance().mapLayersByName(layer_name)[0]
+        iface.setActiveLayer(active_layer)
+
+        """
+        Timer to delay the zoom function until the layer actually is shown on the canvas.
+        The signal emitted from the canvas can sometimes be emitted too fast and 
+        the zoom function will not work as intended.
+        """
+        timer = QTimer()
+        timer.singleShot(500, self.zoom_to_active_layer)
+
+    def zoom_to_active_layer(self):
+        # Zoom to the active layer.
+        iface.zoomToActiveLayer()
+
+    def handle_checkBox_begge(self):
+        if self.dlg.checkBox_begge.isChecked():
+            self.dlg.checkBox_telemark.setChecked(False)
+            self.dlg.checkBox_vestfold.setChecked(False)
+            self.dlg.label_valg.setText('Vestfold og Telemark')
+        else:
+            self.dlg.label_valg.setText('')
+
+    def handle_checkBox_telemark(self):
+        if self.dlg.checkBox_telemark.isChecked():
+            self.dlg.checkBox_begge.setChecked(False)
+            self.dlg.checkBox_vestfold.setChecked(False)
+            self.dlg.label_valg.setText('Telemark')
+        else:
+            self.dlg.label_valg.setText('')
+
+    def handle_checkBox_vestfold(self):
+        if self.dlg.checkBox_vestfold.isChecked():
+            self.dlg.checkBox_begge.setChecked(False)
+            self.dlg.checkBox_telemark.setChecked(False)
+            self.dlg.label_valg.setText('Vestfold')
+        else:
+            self.dlg.label_valg.setText('')
 
     def run(self):
         """Run method that performs all the real work"""
@@ -304,20 +453,40 @@ class loadStopPlacesBuss:
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
+            if os.path.exists(file):
+                os.remove(file)
+            if os.path.exists(file_t):
+                os.remove(file_t)
+            if os.path.exists(file_v):
+                os.remove(file_v)
             self.first_start = False
             self.dlg = loadStopPlacesBussDialog()
 
-        # show the dialog
+            # Connect the buttons and other widgets to the actions performed in the UI
+            self.dlg.checkBox_begge.toggled.connect(self.handle_checkBox_begge)
+            self.dlg.checkBox_vestfold.toggled.connect(self.handle_checkBox_vestfold)
+            self.dlg.checkBox_telemark.toggled.connect(self.handle_checkBox_telemark)
+
+        # Show the dialog
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
         # See if OK was pressed
         if result:
-            self.get_files()
-            self.combine_files()
+            if self.dlg.checkBox_begge.isChecked():
+                self.process_files_telemark()
+                self.process_files_vestfold()
+                self.combine_files()
+
+            elif self.dlg.checkBox_telemark.isChecked():
+                self.process_files_telemark()
+                self.file_telemark()
+
+            elif self.dlg.checkBox_vestfold.isChecked():
+                self.process_files_vestfold()
+                self.file_vestfold()
+
             self.remove_vehicle_type()
             self.remove_stopPlace()
-            #self.load_osm()
             self.load_csv_to_qgis()
-
 

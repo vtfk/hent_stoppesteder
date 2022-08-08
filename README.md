@@ -25,9 +25,9 @@ En plugin skrevet i python med QT5 som designverktøy som benytter seg av EnTur 
 	a.
 		![image](https://user-images.githubusercontent.com/46957821/183373925-daaa7794-d80b-4da7-b98a-022ca31cd7e3.png)
 
-		### 1.Trykk på Installer fra ZIP
-		### 2.Trykk på "…" knapper og naviger til zipfilen du lastet ned i steg 2 (NB, du befinner deg i steg 4.a.2)
-		### 3.Når du har valgt zipfilen du ønsker å installere trykker du på "installer programtillegg"
+		1.Trykk på Installer fra ZIP
+		2.Trykk på "…" knapper og naviger til zipfilen du lastet ned i steg 2 (NB, du befinner deg i steg 4.a.2)
+		3.Når du har valgt zipfilen du ønsker å installere trykker du på "installer programtillegg"
 		
 5. Pluginen vil nå ligge under "Programtillegg" menyen og som et ikon på toolbaren. 
 
